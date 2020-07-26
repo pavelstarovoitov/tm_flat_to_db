@@ -1,13 +1,13 @@
 import glob
 import xml.dom.minidom
 import asyncio
-import asyncio
 import asyncpg
 import mmap
 import struct
 import time
 from itertools import zip_longest
 import datetime
+from unpack import unpack
 
 def tm_parameters(filename):
     doc = xml.dom.minidom.parse(filename)
@@ -71,7 +71,7 @@ async def transformation(paths, beginfiles, endfiles):
                 day = i.split('/')[0]
                 date = convert_data(day)
                 for i in range(23,mm.size(),32):
-                    a = bytearray(mm[i-12:i-20:-1])
+                    a = mm[i-12:i-20:-1]
                     time1 = struct.unpack('!d', a)[0]*1000
                     timelist.append((convert_to_time(time1, date)))
                 mm.close()
@@ -87,39 +87,45 @@ async def transformation(paths, beginfiles, endfiles):
         try:
             with open(i, 'r+b') as f:
                 mm = mmap.mmap(f.fileno(),0)
-                info= [None for  i in range(0,LEN)]
-                info1=[]
                 timelist=[]
-                types= bytearray(mm[15:13:-1])
+                types= (mm[15:13:-1])
                 types = struct.unpack('!h', types)[0]
                 for i in range(23,23+32*2,32):
-                    a = bytearray(mm[i-12:i-20:-1])
+                    a = mm[i-12:i-20:-1]
                     time1 = struct.unpack('!d', a)[0]*1000
                     timelist.append(convert_to_time(time1, date))
-                    
+
+                # sl =int((mm.size()-23)/32)
+                # info1= unpack(mm,types)[:sl]
+                # print(info1)
+                begin =data[0].index(timelist[0])
+                step =  (data[0].index(timelist[1])-begin) if (data[0].index(timelist[1])-begin) else 1
+                end=int((mm.size()-23)/32) 
+                if LEN<end:
+                    LEN=end
+                count=0
+                info= [None for  i in range(0,LEN)]
                 if types == 0:
                     for i in range(23,mm.size(),32):
-                        d2= bytearray(mm[i:i-8:-1])
+                        d2= mm[i:i-8:-1]
                         d2 = struct.unpack('!d', d2)[0]
-                        info1.append(d2)
+                        if begin+count*step>=LEN:
+                            break
+                        info[begin+count*step]=d2
+                        count+=1
                 else:
                     for i in range(23,mm.size(),32):
-                        d2= bytearray(mm[i-4:i-8 :-1])
+                        d2= mm[i-4:i-8 :-1]
                         d2 = struct.unpack('!i', d2)[0]
-                        info1.append(d2)
-
-                begin =data[0].index(timelist[0])
-                step =  (data[0].index(timelist[1])-begin)  if (data[0].index(timelist[1])-begin) else 1
-                end=len(info1)
-                count=0
-
-                for i in range(begin,end,step):
-                    info[i]=info1[count]
-                    count+=1
+                        if begin+count*step>=LEN:
+                            break
+                        info[begin+count*step]=d2
+                        count+=1
+        
                 mm.close()
                 data.append(info)
         except FileNotFoundError: 
-            print('file not found')
+            #print('file not found')
             info= [None for  i in range(0,LEN)]
             data.append(info)
 
@@ -175,7 +181,6 @@ async def run():
         print(f' {elapsed:0.4}','transformation end,','copy to db start')
         
         await conn.copy_records_to_table(table_name, records =data, columns= cols, timeout=60)
-
 
         elapsed = time.perf_counter() - start
         print(f'{elapsed:0.4}','copy to db end')
