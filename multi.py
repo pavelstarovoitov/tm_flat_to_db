@@ -10,9 +10,6 @@ def collect_result(val):
 def cube(x):
     print(f"start process {x}")
     time.sleep(1)
-    i=1
-    while i == True:
-        i^i
     print(f"end process {x}")
     return x * x * x
 
@@ -30,7 +27,7 @@ if __name__ == "__main__":
         pool.close()
         pool.join()
         create_table="CREATE TABLE IF NOT EXISTS testload (time   TIMESTAMP WITH TIME ZONE,  TM1 REAL);"
-        conn = await asyncpg.connect(user='postgres', password='qw005870',database='testload',host='localhost')
+        conn = await asyncpg.connect(user='postgres', password='123456',database='testload',host='localhost')
         await conn.execute(create_table)
         date_time_str = '1999-01-08 04:05:06'
         date = datetime.datetime.strptime(date_time_str, '%Y-%m-%d %H:%M:%S')
